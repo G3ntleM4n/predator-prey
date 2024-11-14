@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" type="text/css" href="jsxgraph.css" />
+  <title>Predator-Prey</title>
+</head>
+
+<style>
+  * {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #box,
+  #box2 {
+    width: 800px;
+    height: 800px;
+  }
+
+  #box2 {
+    margin-left: 40px;
+  }
+
+  .stationary {
+    flex-shrink: 0;
+    margin-top: 30px;
+    line-height: 30px;
+  }
+</style>
+
+<body>
+  <div class="container">
+    <div id="box" class="jxgbox">
+    </div>
+    <div id="box2" class="jxgbox">
+    </div>
+  </div>
+  <div class="stationary"></div>
+</body>
+<script type="text/javascript" src="jsxgraphcore.js"></script>
+<script type="module" src="app.js"></script>
+
+<script>
+  let box = document.getElementById('box');
+
+  let board = JXG.JSXGraph.initBoard(
+    box.id,
+    {
+      boundingbox: [-4, 40.5, 95.5, -3.5],
+      axis: true,
+      grid: false,
+      showCopyright: false
+    }
+  );
+
+  let alpha_slider = board.create('slider', [
+    [10.0, 38],
+    [20.0, 38],
+    [0.0, 0.3, 1.0]
+  ], {
+    name: 'a',
+    strokeColor: 'black',
+    fillColor: 'black'
+  });
+  let alpha_text = board.create('text', [10, 36.5, "вероятность рождаемости жертв"], {
+    fixed: true
+  });
+
+  let beta_slider = board.create('slider', [
+    [10.0, 34],
+    [20.0, 34],
+    [0.0, 0.28, 1.0]
+  ], {
+    name: 'b',
+    strokeColor: 'black',
+    fillColor: 'black'
+  });
+  let beta_text = board.create('text', [10, 32.5, "вероятность смертности жертв при встрече с хищником"], {
+    fixed: true
+  });
+
+  let gamma_slider = board.create('slider', [
+    [60.0, 38],
+    [70.0, 38],
+    [0.0, 0.7, 1.0]
+  ], {
+    name: 'c',
+    strokeColor: 'black',
+    fillColor: 'black'
+  });
+  let gamma_text = board.create('text', [60, 36.5, "вероятность убыли хищников при нехватке еды"], {
+    fixed: true
+  });
+
+  let delta_slider = board.create('slider', [
+    [60.0, 34],
+    [70.0, 34],
+    [0.0, 0.3, 1.0]
+  ], {
+    name: 'd',
+    strokeColor: 'black',
+    fillColor: 'black'
+  });
+  let delta_text = board.create('text', [60, 32.5, "вероятность достаточности еды для размножения хищников"], {
+    fixed: true
+  });
+
+  let predatorStart = board.create(
+    'glider',
+    [0, 10, board.defaultAxes.y],
+    { name: 'Predators', size: 2, face: '+', color: 'red' }
+  );
+
+  let preyStart = board.create(
+    'glider',
+    [0, 5, board.defaultAxes.y],
+    { name: 'Preys', size: 2, face: '+', color: 'blue' }
+  );
+
+
+  const solve_k = (V, P) => {
+    // Точки а-d взяты из показаний слайдеров на графике.
+    // Это позволяет удобно менять данные путем перетаскивания слайдера.
+    let a = alpha_slider.Value();
+    let b = beta_slider.Value();
+    let c = gamma_slider.Value();
+    let d = delta_slider.Value();
+
+    const array = [];
+
+    array.push(
+      (a - b * P) * V,      // Preys
+      (-c + d * V) * P     // Predators
+    );
+    return array;   // [Prey, Predator]
+  }
+
+  const rungeKutta = () => {
+    const elements = [0, 100];
+    let dataCount = 1000; // Количество точек
+    let step = (elements[1] - elements[0]) / dataCount;
+
+    const k1 = [];
+    const k2 = [];
+    const k3 = [];
+    const k4 = [];
+    const delta = [];
+    const t = [0];
+    const data = [[preyStart.Y(), predatorStart.Y(), t[0]]];
+
+    for (let i = 0; i < dataCount; i += 1) {
+      k1.push(solve_k(
+        data[i][0],
+        data[i][1]
+      )); // k1 === [[k1_Prey0, k1_Predator0], [k1_Prey1, k1_Predator1], [...]]
+
+      k2.push(solve_k(
+        data[i][0] + (step * k1[i][0] / 2),
+        data[i][1] + (step * k1[i][1] / 2)
+      )); // same structure as k1
+
+      k3.push(solve_k(
+        data[i][0] + (step * k2[i][0] / 2),
+        data[i][1] + (step * k2[i][1] / 2)
+      )); // same structure as k1
+
+      k4.push(solve_k(
+        data[i][0] + (step * k3[i][0]),
+        data[i][1] + (step * k3[i][1])
+      )); // same structure as k1
+
+      delta.push([
+        (step / 6) * (k1[i][0] + 2 * k2[i][0] + 2 * k3[i][0] + k4[i][0]),
+        (step / 6) * (k1[i][1] + 2 * k2[i][1] + 2 * k3[i][1] + k4[i][1]),
+      ]); // same structure as k1
+
+      t.push(t[i] + step);
+
+      data.push([
+        data[i][0] + delta[i][0],
+        data[i][1] + delta[i][1],
+        t[i],
+      ]); // data === [[Prey_0, Predator_0, time_0], [Prey_1, Predator_1, time_1], [...]]
+    }
+    return data;
+  }
+
+  const data = rungeKutta();
+
+  const data_prey = [];
+  const data_predator = [];
+  const time = [];
+
+  for (let i = 0; i < data.length; i += 1) {
+    data_prey.push(data[i][0]);
+    data_predator.push(data[i][1]);
+    time.push(data[i][2]);
+  };
+
+  let PreyCurve = board.create('curve', [time, data_prey], {
+    strokeColor: 'blue',
+    strokeWidth: '3px'
+  });
+  PreyCurve.updateDataArray = function () {
+    const data = rungeKutta();
+    this.dataX = [];
+    this.dataY = [];
+    for (let i = 0; i < data.length; i++) {
+      this.dataX.push(time[i]);
+      this.dataY.push(data[i][0]);
+    }
+
+    let a = alpha_slider.Value();
+    let b = beta_slider.Value();
+    let c = gamma_slider.Value();
+    let d = delta_slider.Value();
+
+    // Стационарная точка
+    let V_st = c / d;
+    let P_st = a / b;
+
+    const statPoint = document.getElementsByClassName('stationary');
+    let i = 0;
+
+    const result = `
+        <hr>
+        <p class="list_item">
+          <b>Стационарная точка</b>: (${V_st.toFixed(3)};${P_st.toFixed(3)})
+        </p>\n
+        <hr>
+      `
+    // Отображение html значения
+    document.querySelector('.stationary').innerHTML = result;
+  };
+
+  let PredatorCurve = board.create('curve', [time, data_predator], {
+    strokeColor: 'red',
+    strokeWidth: '3px'
+  });
+  PredatorCurve.updateDataArray = function () {
+    const data = rungeKutta();
+    this.dataX = [];
+    this.dataY = [];
+    for (let i = 0; i < data.length; i++) {
+      this.dataX.push(time[i]);
+      this.dataY.push(data[i][1]);
+    }
+  };
+
+  board.update();
+
+  let box_phase = document.getElementById('box2');
+
+  let board_phase = JXG.JSXGraph.initBoard(
+    box_phase.id,
+    {
+      boundingbox: [-4, 40.5, 95.5, -3.5],
+      axis: true,
+      grid: false,
+      showCopyright: false
+    }
+  );
+
+  let alpha_slider_phase = board_phase.create('slider', [
+    [10.0, 38],
+    [20.0, 38],
+    [0.0, 0.3, 1.0]
+  ], {
+    name: 'a',
+    strokeColor: 'black',
+    fillColor: 'black'
+  });
+  let alpha_text_phase = board_phase.create('text', [10, 36.5, "вероятность рождаемости жертв"], {
+    fixed: true
+  });
+
+  let beta_slider_phase = board_phase.create('slider', [
+    [10.0, 34],
+    [20.0, 34],
+    [0.0, 0.28, 1.0]
+  ], {
+    name: 'b',
+    strokeColor: 'black',
+    fillColor: 'black'
+  });
+  let beta_text_phase = board_phase.create('text', [10, 32.5, "вероятность смертности жертв при встрече с хищником"], {
+    fixed: true
+  });
+
+  let gamma_slider_phase = board_phase.create('slider', [
+    [60.0, 38],
+    [70.0, 38],
+    [0.0, 0.7, 1.0]
+  ], {
+    name: 'c',
+    strokeColor: 'black',
+    fillColor: 'black'
+  });
+  let gamma_text_phase = board_phase.create('text', [60, 36.5, "вероятность убыли хищников при нехватке еды"], {
+    fixed: true
+  });
+
+  let delta_slider_phase = board_phase.create('slider', [
+    [60.0, 34],
+    [70.0, 34],
+    [0.0, 0.3, 1.0]
+  ], {
+    name: 'd',
+    strokeColor: 'black',
+    fillColor: 'black'
+  });
+  let delta_text_phase = board_phase.create('text', [60, 32.5, "вероятность достаточности еды для размножения хищников"], {
+    fixed: true
+  });
+
+  let preyStart_phase = board_phase.create(
+    'glider',
+    [10, 0, board_phase.defaultAxes.x],
+    { name: 'Preys', size: 2, face: '+', color: 'blue' }
+  );
+
+  let predatorStart_phase = board_phase.create(
+    'glider',
+    [0, 5, board_phase.defaultAxes.y],
+    { name: 'Predators', size: 2, face: '+', color: 'red' }
+  );
+
+  const solve_k_phase = (V, P) => {
+    let a = alpha_slider_phase.Value();
+    let b = beta_slider_phase.Value();
+    let c = gamma_slider_phase.Value();
+    let d = delta_slider_phase.Value();
+
+    const array = [];
+
+    array.push(
+      (a - b * P) * V,      // Preys
+      (-c + d * V) * P     // Predators
+    );
+    return array;   // [Prey, Predator]
+  }
+
+  const rungeKutta_phase = () => {
+    const elements = [0, 200];
+    let dataCount = 5000;
+    let step = (elements[1] - elements[0]) / dataCount;
+
+    const k1 = [];
+    const k2 = [];
+    const k3 = [];
+    const k4 = [];
+    const delta = [];
+    const t = [0];
+    const data = [[preyStart_phase.X(), predatorStart_phase.Y()]];
+
+    for (let i = 0; i < dataCount; i += 1) {
+      k1.push(solve_k_phase(
+        data[i][0],
+        data[i][1]
+      )); // k1 === [[k1_Prey0, k1_Predator0], [k1_Prey1, k1_Predator1], [...]]
+
+      k2.push(solve_k_phase(
+        data[i][0] + (step * k1[i][0] / 2),
+        data[i][1] + (step * k1[i][1] / 2)
+      )); // same structure as k1
+
+      k3.push(solve_k_phase(
+        data[i][0] + (step * k2[i][0] / 2),
+        data[i][1] + (step * k2[i][1] / 2)
+      )); // same structure as k1
+
+      k4.push(solve_k_phase(
+        data[i][0] + (step * k3[i][0]),
+        data[i][1] + (step * k3[i][1])
+      )); // same structure as k1
+
+      delta.push([
+        (step / 6) * (k1[i][0] + 2 * k2[i][0] + 2 * k3[i][0] + k4[i][0]),
+        (step / 6) * (k1[i][1] + 2 * k2[i][1] + 2 * k3[i][1] + k4[i][1]),
+      ]); // same structure as k1
+
+      data.push([
+        data[i][0] + delta[i][0],
+        data[i][1] + delta[i][1],
+      ]); // data === [[Prey_0, Predator_0], [Prey_1, Predator_1], [...]]
+    }
+    return data;
+  }
+
+  const data_phase = rungeKutta();
+
+  const data_prey_phase = [];
+  const data_predator_phase = [];
+
+  for (let i = 0; i < data_phase.length; i += 1) {
+    data_prey_phase.push(data_phase[i][0]);
+    data_predator_phase.push(data_phase[i][1]);
+  };
+
+  let PhaseCurve = board_phase.create('curve', [data_prey_phase, data_predator_phase], {
+    strokeColor: 'purple',
+    strokeWidth: '3px'
+  });
+  PhaseCurve.updateDataArray = function () {
+    const data = rungeKutta_phase();
+    this.dataX = [];
+    this.dataY = [];
+    for (let i = 0; i < data.length; i++) {
+      this.dataX.push(data[i][0]);
+      this.dataY.push(data[i][1]);
+    }
+  };
+  board_phase.update();
+</script>
+
+</html>
